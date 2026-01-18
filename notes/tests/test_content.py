@@ -17,27 +17,22 @@ class TestNotes(TestCase):
     def setUpTestData(cls):
         cls.author = User.objects.create(username='user')
 
-        for i in range (cls.TEST_LIMIT):
+        # Не получается применить bulk_create(), чтобы генерировался slug.
+        for i in range(cls.TEST_LIMIT):
             note = Note.objects.create(
-                title = f'note {i}',
-                text = 'content',
-                author = cls.author,
+                title=f'note {i}',
+                text='content',
+                author=cls.author,
             )
             note.save()
+
         cls.note = Note.objects.create(
-            title = f'note {cls.TEST_LIMIT}',
-            text = 'content',
-            author = cls.author,
-            slug = 'note-slug',
+            title=f'note {cls.TEST_LIMIT}',
+            text='content',
+            author=cls.author,
+            slug='note-slug',
         )
         cls.note.save()
-        # Note.objects.bulk_create(
-        #     Note(
-        #         title=f'note {index}',
-        #         text='content',
-        #         author=cls.author)
-        #     for index in range(5)
-        # )
 
     def test_notes_order(self):
         self.client.force_login(self.author)
