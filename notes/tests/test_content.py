@@ -4,6 +4,7 @@ from django.urls import reverse
 
 from pytils.translit import slugify
 
+from notes.forms import NoteForm
 from notes.models import Note
 
 User = get_user_model()
@@ -23,12 +24,13 @@ class TestNotes(TestCase):
                 author = cls.author,
             )
             note.save()
-        note = Note.objects.create(
+        cls.note = Note.objects.create(
             title = f'note {cls.TEST_LIMIT}',
             text = 'content',
             author = cls.author,
             slug = 'note-slug',
         )
+        cls.note.save()
         # Note.objects.bulk_create(
         #     Note(
         #         title=f'note {index}',
@@ -53,3 +55,17 @@ class TestNotes(TestCase):
             self.assertEqual(obj.slug, slugify(obj.title))
         special_obj = object_list[self.TEST_LIMIT]
         self.assertNotEqual(special_obj.slug, slugify(special_obj.title))
+
+    def test_authorized_client_has_form(self):
+        self.client.force_login(self.author)
+        note_slug = self.note.slug
+        url_names = (
+            ('notes:add', None),
+            ('notes:edit', (note_slug,)),
+        )
+        for name, args in url_names:
+            with self.subTest(name=name):
+                url = reverse(name, args=args)
+                response = self.client.get(url)
+                self.assertIn('form', response.context)
+                self.assertIsInstance(response.context['form'], NoteForm)
