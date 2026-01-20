@@ -4,6 +4,9 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
+from pytils.translit import slugify
+
+from notes.forms import WARNING
 from notes.models import Note
 
 User = get_user_model()
@@ -16,6 +19,7 @@ class TestNoteCreation(TestCase):
         cls.author = User.objects.create(username='author')
         cls.auth_client = Client()
         cls.auth_client.force_login(cls.author)
+        cls.url = reverse('notes:add')
         cls.form_data = {
             'title': 'title',
             'text': 'content',
@@ -23,11 +27,55 @@ class TestNoteCreation(TestCase):
         }
 
     def test_anonymous_user_cant_create_note(self):
-        self.client.post(reverse('notes:add'), self.form_data)
+        self.client.post(self.url, self.form_data)
         self.assertEqual(Note.objects.count(), 0)
 
     def test_authorized_user_can_create_note(self):
-        self.auth_client.post(reverse('notes:add'), self.form_data)
+        self.auth_client.post(self.url, self.form_data)
+        self.assertEqual(Note.objects.count(), 1)
+        new_note = Note.objects.first()
+        self.assertEqual(new_note.title, self.form_data['title'])
+        self.assertEqual(new_note.text, self.form_data['text'])
+        self.assertEqual(new_note.slug, self.form_data['slug'])
+        self.assertEqual(new_note.author, self.author)
+
+    # Мне не понятен смысл этого теста, тег unique стоит в модели.
+    def test_not_unique_slug(self):
+        note = Note.objects.create(
+            title='title',
+            text='content',
+            author=self.author,
+            slug=self.form_data['slug']
+        )
+        note.save()
+        response = self.auth_client.post(self.url, self.form_data)
+        self.assertFormError(
+            response.context['form'],
+            'slug',
+            errors=(note.slug + WARNING)
+        )
+        self.assertEqual(Note.objects.count(), 1)
+
+    def test_slug_formatting(self):
+        self.form_data.pop('slug')
+        self.form_data['title'] = 'SomE str1ng_ title to TEST мяу!'
+        response = self.auth_client.post(self.url, self.form_data)
+        self.assertRedirects(response, reverse('notes:success'))
+        self.assertEqual(Note.objects.count(), 1)
+        new_note = Note.objects.first()
+        expected_slug = slugify(self.form_data['title'])
+        self.assertEqual(new_note.slug, expected_slug)
+
+    # Я бы оставил такой тест на unique.
+    def test_not_unique_with_formating_slug(self):
+        self.form_data.pop('slug')
+        self.auth_client.post(self.url, self.form_data)
+        response = self.auth_client.post(self.url, self.form_data)
+        self.assertFormError(
+            response.context['form'],
+            'slug',
+            errors=(Note.objects.get().slug + WARNING)
+        )
         self.assertEqual(Note.objects.count(), 1)
 
 

@@ -22,9 +22,23 @@ class TestRoutes(TestCase):
             author=cls.author
         )
 
-    def test_home_page(self):
-        response = self.client.get(reverse('notes:home'))
-        self.assertEqual(response.status_code, HTTPStatus.OK)
+    def test_pages_availability_for_anonymous_user(self):
+        url_names = (
+            'notes:home',
+            'users:login',
+            'users:signup',
+        )
+        for name in url_names:
+            with self.subTest(name=name):
+                response = self.client.get(reverse(name))
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+
+    def test_logout_session(self):
+        url = reverse('users:logout')
+        self.client.force_login(self.other_user)
+        self.client.post(url)
+        self.assertNotIn('_auth_user_id', self.client.session)
+
 
     def test_authorized_access(self):
         self.client.force_login(self.other_user)
